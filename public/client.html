@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard des Tâches avec Filtres</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>📊 Dashboard des Tâches</h1>
+
+    <!-- Filtres -->
+    <div>
+        <label for="startDate">Date de début:</label>
+        <input type="date" id="startDate">
+
+        <label for="endDate">Date de fin:</label>
+        <input type="date" id="endDate">
+
+        <label for="userId">Utilisateur:</label>
+        <select id="userId">
+            <option value="">Tous les utilisateurs</option>
+            <!-- Remplir dynamiquement avec les utilisateurs -->
+        </select>
+
+        <button onclick="applyFilters()">Appliquer les filtres</button>
+    </div>
+
+    <!-- Graphique -->
+    <canvas id="taskChart" width="400" height="200"></canvas>
+
+    <script>
+        const socket = io("http://localhost:5000"); // Assure-toi que ton serveur est bien lancé
+        const token = "Bearer <TON_TOKEN>"; // Remplace par ton token JWT
+
+        const ctx = document.getElementById("taskChart").getContext("2d");
+        let taskChart;
+
+        // Récupérer les utilisateurs
+        async function fetchUsers() {
+            try {
+                const res = await fetch("http://localhost:5000/api/users", {
+                    headers: { Authorization: token } // Assure-toi d'ajouter un token JWT pour l'authentification
+                });
+                if (!res.ok) throw new Error("Impossible de récupérer les utilisateurs");
+                const users = await res.json();
+                const userSelect = document.getElementById("userId");
+
+                // Vider la liste des options avant de la remplir
+                userSelect.innerHTML = '<option value="">Tous les utilisateurs</option>'; // Option par défaut
+
+                // Ajouter les utilisateurs dynamiquement
+                users.forEach(user => {
+                    const option = document.createElement("option");
+                    option.value = user._id;
+                    option.textContent = user.name;  // Remplacer 'user.name' par le champ approprié de l'utilisateur
+                    userSelect.appendChild(option);
+                });
+            } catch (error) {
+                alert("Erreur lors du chargement des utilisateurs: " + error.message);
+            }
+        }
+
+        // Fonction pour récupérer les stats avec filtres
+        async function fetchStats(filters = {}) {
+            const { startDate, endDate, userId } = filters;
+
+            let url = `http://localhost:5000/api/stats?startDate=${startDate}&endDate=${endDate}&userId=${userId}`;
+            try {
+                const res = await fetch(url, {
+                    headers: { Authorization: token }
+                });
+                if (!res.ok) throw new Error("Impossible de récupérer les statistiques");
+                const data = await res.json();
+
+                const labels = data.map(stat => stat._id);
+                const counts = data.map(stat => stat.count);
+
+                if (taskChart) {
+                    taskChart.destroy();
+                }
+
+                taskChart = new Chart(ctx, {
+                    type: "bar",
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: "Nombre de Tâches",
+                            data: counts,
+                            backgroundColor: ["#4CAF50", "#FF9800", "#F44336"],
+                            borderColor: "#333",
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            } catch (error) {
+                alert("Erreur lors du chargement des statistiques: " + error.message);
+            }
+        }
+
+        // Appliquer les filtres
+        function applyFilters() {
+            const startDate = document.getElementById("startDate").value;
+            const endDate = document.getElementById("endDate").value;
+            const userId = document.getElementById("userId").value;
+
+            fetchStats({ startDate, endDate, userId });
+        }
+
+        // Mettre à jour les stats en temps réel
+        socket.on("taskCreated", fetchStats);
+        socket.on("taskUpdated", fetchStats);
+        socket.on("taskDeleted", fetchStats);
+
+        // Charger les stats initiales
+        fetchStats();
+
+        // Charger les utilisateurs
+        fetchUsers();
+    </script>
+</body>
+</html>
