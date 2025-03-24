@@ -12,13 +12,15 @@ import path from "path";
 import { fileURLToPath } from "url";
 import userRoutes from "./routes/userRoutes.js";
 
+
 // Chargement des variables d'environnement
 dotenv.config();
 
 // Initialisation de l'application et du serveur HTTP
 const app = express();
 const server = http.createServer(app);
-// Obtenir le répertoire actuel de manière compatible avec ES modules
+
+// Obtenir le chemin du fichier actuel
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -60,10 +62,13 @@ mongoose.connect(MONGO_URI)
 
 // Gestion des connexions WebSocket
 io.on("connection", (socket) => {
-    console.log("🔌 Un utilisateur est connecté", socket.id);
+    console.log("🔌 Un utilisateur est connecté avec l'id : ", socket.id);
+
+    // Exemple d'événement émis
+    socket.emit("message", "Bienvenue sur le serveur Socket.io !");
 
     socket.on("disconnect", () => {
-        console.log("❌ Utilisateur déconnecté", socket.id);
+        console.log("❌ Utilisateur" , socket.id, "déconnecté");
     });
 });
 
@@ -86,3 +91,4 @@ server.listen(PORT, () => {
 });
 
 connectDB();
+
